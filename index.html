@@ -56,8 +56,7 @@
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [isSuggesting, setIsSuggesting] = useState(false);
+            
             const messagesEndRef = useRef(null);
 
             // ===========================================================================================
@@ -80,8 +79,7 @@
             }, [messages]);
             
             /**
-             * NEW: A more resilient API call function with automatic retries.
-             * This will automatically try again if the model is temporarily overloaded.
+             * A resilient API call function with automatic retries for server errors.
              */
             const callApiWithRetries = async (prompt, retries = 3, delay = 1000) => {
                 if (API_KEY === "YOUR_API_KEY_HERE" || !API_KEY) {
@@ -96,51 +94,27 @@
                             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
                         });
 
-                        // If the response is a server error (like 500, 503), throw an error to trigger a retry.
                         if (!response.ok && response.status >= 500) {
                             throw new Error(`Server error: ${response.status}`);
                         }
                         
-                        // If response is a client error (like 400), don't retry, just show the error.
                         if (!response.ok) {
                             const errorResult = await response.json();
-                            console.error("Gemini API Client Error:", errorResult);
                             return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
                         }
                         
-                        // If response is successful, return the text.
                         const result = await response.json();
                         return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
 
                     } catch (error) {
-                        console.error(`Attempt ${i + 1} failed: ${error}. Retrying in ${delay / 1000}s...`);
-                        // If this was the last retry, return the final error message.
+                        console.error(`Attempt ${i + 1} failed: ${error}.`);
                         if (i === retries - 1) {
-                            return "Error: The model is overloaded. Please try again later.";
+                            return "Error: The model seems to be overloaded or unavailable after multiple attempts. Please try again later.";
                         }
-                        // Wait for the specified delay before the next attempt.
                         await new Promise(resolve => setTimeout(resolve, delay));
-                        // Double the delay for the next retry (exponential backoff).
                         delay *= 2;
                     }
                 }
-            };
-
-            const generateOptimizedPsychPrompt = async (userInput) => {
-                const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-                if (userInput.split(' ').length <= 3 && simpleGreetings.includes(userInput.toLowerCase().trim())) {
-                    return "SIMPLE_GREETING";
-                }
-                const promptForDirection = `As a prompt engineer for a psychology chatbot, refine the user's input into a precise psychological "direction". Distill the core essence and underlying issues. If vague, aim for clarifying questions.\n**User Input:** "${userInput}"\n**Final Direction:**`;
-                return callApiWithRetries(promptForDirection);
-            };
-
-            const getPsychBotResponse = async (optimizedPrompt) => {
-                if (optimizedPrompt === "SIMPLE_GREETING") {
-                    return "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.";
-                }
-                const finalPrompt = `As an empathetic therapist, provide a psychoanalytic response for: "${optimizedPrompt}". Use a compassionate tone, offer insights on principles like cognitive distortions without jargon, give self-reflection prompts, and maintain a conversational flow.`;
-                return callApiWithRetries(finalPrompt);
             };
 
             const handleSendMessage = async (e) => {
@@ -152,38 +126,66 @@
                 setInputValue('');
                 setIsLoading(true);
 
-                const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
-                if (!optimizedPromptDirection.startsWith("Error:")) {
-                     if (optimizedPromptDirection !== "SIMPLE_GREETING") {
-                        setMessages(prev => [...prev, { text: `**System Thought:** Focusing on: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
-                     }
-                     const botResponse = await getPsychBotResponse(optimizedPromptDirection);
-                     setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
-                } else {
-                    setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
+                // Handle simple greetings locally without an API call
+                const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
+                if (simpleGreetings.includes(userQuery.toLowerCase())) {
+                    setMessages(prev => [...prev, { text: "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.", sender: 'bot' }]);
+                    setIsLoading(false);
+                    return;
                 }
+
+                // NEW EFFICIENT LOGIC: A single prompt for both thought and response
+                const masterPrompt = `
+                    You are an expert, empathetic therapist AI. A user has sent the following query.
+                    USER QUERY: "${userQuery}"
+
+                    YOUR TASK:
+                    Respond in two distinct parts, enclosed in specific tags.
+                    1.  First, create a "system thought" where you rephrase the user's query into its core psychological concept. This should be concise and insightful. Enclose this part in [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT] tags.
+                    2.  Second, write your full, empathetic, and insightful therapeutic response to the user. Address the core concept you identified. Offer psychoanalytic insights (like cognitive distortions, attachment styles) in simple terms, and provide gentle prompts for self-reflection. Enclose this part in [FINAL_RESPONSE]...[/FINAL_RESPONSE] tags.
+
+                    EXAMPLE:
+                    USER QUERY: "why do i feel bad about getting bad grades in this particular subject?"
+                    YOUR RESPONSE:
+                    [SYSTEM_THOUGHT]Focusing on: The connection between academic performance, self-worth, and subject-specific anxiety.[/SYSTEM_THOUGHT][FINAL_RESPONSE]It's completely understandable to feel bad when you don't meet your own expectations in a subject, especially if it's one you care about. This feeling often isn't just about the grade itself, but what we subconsciously tie to it—things like our intelligence, our future success, or how others see us. This can be a form of **catastrophizing**, a cognitive distortion where we jump to the worst possible conclusion. A helpful question to ask yourself is: "What story am I telling myself about what this grade means about me?" Exploring that can often reveal the true source of the pain. It's rarely just about the letter on the page.[/FINAL_RESPONSE]
+                `;
+
+                const fullResponse = await callApiWithRetries(masterPrompt);
+
+                // Parse the response to separate the system thought and final response
+                const systemThoughtMatch = fullResponse.match(/\[SYSTEM_THOUGHT\](.*?)\[\/SYSTEM_THOUGHT\]/s);
+                const finalResponseMatch = fullResponse.match(/\[FINAL_RESPONSE\](.*?)\[\/FINAL_RESPONSE\]/s);
+
+                const systemThought = systemThoughtMatch ? systemThoughtMatch[1].trim() : null;
+                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : fullResponse; // Fallback to full response if parsing fails
+
+                if (systemThought) {
+                    setMessages(prev => [...prev, { text: `**System Thought:** ${systemThought}`, sender: 'system-thought' }]);
+                }
+                setMessages(prev => [...prev, { text: finalResponse, sender: 'bot' }]);
                 
                 setIsLoading(false);
             };
-
-            const analyzeLastMessageSentiment = async () => {
+            
+            // This function is now simplified and only calls the master prompt logic
+            const analyzeAndSuggest = async (type) => {
                 const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
                 if (!lastUserMessage) return;
-                setIsAnalyzing(true);
-                const prompt = `Analyze emotions in this text, including potential "blind spots". Give a concise description and empathetic insight. Start with "**Emotion & Insight:**".\n**Text:** "${lastUserMessage.text}"`;
-                const analysis = await callApiWithRetries(prompt);
-                setMessages(prev => [...prev, { text: `✨ ${analysis}`, sender: 'bot' }]);
-                setIsAnalyzing(false);
-            };
+                
+                setIsLoading(true);
 
-            const suggestCopingStrategy = async () => {
-                const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
-                if (!lastUserMessage) return;
-                setIsSuggesting(true);
-                const prompt = `Based on this statement, suggest a simple, evidence-based coping strategy. Make it actionable. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
-                const strategy = await callApiWithRetries(prompt);
-                setMessages(prev => [...prev, { text: `🌱 ${strategy}`, sender: 'bot' }]);
-                setIsSuggesting(false);
+                let specificPrompt;
+                if (type === 'analyze') {
+                    specificPrompt = `Based on the user's last statement, provide a concise sentiment analysis and psychological insight. Start with "**Emotion & Insight:**".\n**User Statement:** "${lastUserMessage.text}"`;
+                } else {
+                    specificPrompt = `Based on the user's last statement, suggest a simple, evidence-based coping strategy. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
+                }
+                
+                const response = await callApiWithRetries(specificPrompt);
+                const prefix = type === 'analyze' ? '✨' : '🌱';
+                setMessages(prev => [...prev, { text: `${prefix} ${response}`, sender: 'bot' }]);
+                
+                setIsLoading(false);
             };
 
             return (
@@ -215,7 +217,7 @@
                                     </div>
                                 ))
                             )}
-                            {(isLoading || isAnalyzing || isSuggesting) && (
+                            {isLoading && (
                                 <div className="flex justify-start">
                                     <div className="max-w-[80%] px-4 py-2 rounded-xl">
                                         <div className="dot-pulse"><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div></div>
@@ -227,18 +229,18 @@
                         
                         <form onSubmit={handleSendMessage} className="p-4 sm:p-5 bg-white border-t border-gray-100 flex items-center gap-3">
                             <div className="flex-1">
-                                <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Type your thoughts here..." className="input-field w-full" disabled={isLoading || isAnalyzing || isSuggesting}/>
+                                <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Type your thoughts here..." className="input-field w-full" disabled={isLoading}/>
                             </div>
-                            <button type="submit" className="send-button text-white" disabled={!inputValue.trim() || isLoading || isAnalyzing || isSuggesting}>
+                            <button type="submit" className="send-button text-white" disabled={!inputValue.trim() || isLoading}>
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" /></svg>
                             </button>
                         </form>
                         
                         <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex justify-center gap-4 flex-wrap">
-                            <button onClick={analyzeLastMessageSentiment} className="feature-button bg-blue-600 hover:bg-blue-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                            <button onClick={() => analyzeAndSuggest('analyze')} className="feature-button bg-blue-600 hover:bg-blue-700" disabled={isLoading || messages.filter(msg => msg.sender === 'user').length === 0}>
                                 ✨ Analyze Feelings
                             </button>
-                            <button onClick={suggestCopingStrategy} className="feature-button bg-green-600 hover:bg-green-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                            <button onClick={() => analyzeAndSuggest('suggest')} className="feature-button bg-green-600 hover:bg-green-700" disabled={isLoading || messages.filter(msg => msg.sender === 'user').length === 0}>
                                 🌱 Coping Tips
                             </button>
                         </div>
