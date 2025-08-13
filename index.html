@@ -48,213 +48,197 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        document.addEventListener('DOMContentLoaded', () => {
-            const { useState, useEffect, useRef } = React;
-            const { createRoot } = ReactDOM;
-            const marked = window.marked;
+        // This script will run after the DOM is fully loaded and parsed.
+        const { useState, useEffect, useRef } = React;
+        const ReactDOM = window.ReactDOM; // Explicitly get ReactDOM from the window object
+        const marked = window.marked;
+
+        const App = () => {
+            const [messages, setMessages] = useState([]);
+            const [inputValue, setInputValue] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [isSuggesting, setIsSuggesting] = useState(false);
+            const messagesEndRef = useRef(null);
 
             // ===========================================================================================
             // !!! ----------------------------- IMPORTANT API KEY CONFIGURATION ----------------------- !!!
-            //                                                                                           #
-            //   1. Replace "YOUR_GEMINI_API_KEY_HERE" with your actual Gemini API key.                  #
-            //   2. Get your key from: https://aistudio.google.com/app/apikey                            #
-            //                                                                                           #
-            //   SECURITY WARNING: This method is for LOCAL TESTING ONLY.                                #
-            //   If you upload this file to a public website (like GitHub Pages), your key will be       #
-            //   exposed and can be stolen. For a live site, you must use a backend server.              #
-            //                                                                                           #
+            //
+            //   1. Replace "YOUR_GEMINI_API_KEY_HERE" with your actual Gemini API key.
+            //   2. Get your key from: https://aistudio.google.com/app/apikey
+            //
+            //   SECURITY WARNING: This method is for LOCAL TESTING ONLY.
+            //   If you upload this file to a public website (like GitHub Pages), your key will be
+            //   exposed and can be stolen. For a live site, you must use a backend server.
+            //
             // ===========================================================================================
             const API_KEY = "AIzaSyDgBe4ibRkgIyAyTFkZuV8uiPMbIrKwRfU"; // <-- REPLACE WITH YOUR REAL KEY
             const MODEL_NAME = "gemini-1.5-flash";
             const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
 
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, [messages]);
 
-            const App = () => {
-                const [messages, setMessages] = useState([]);
-                const [inputValue, setInputValue] = useState('');
-                const [isLoading, setIsLoading] = useState(false);
-                const [isAnalyzing, setIsAnalyzing] = useState(false);
-                const [isSuggesting, setIsSuggesting] = useState(false);
-                const messagesEndRef = useRef(null);
+            const callApi = async (prompt) => {
+                // Check for a missing API key before trying to fetch
+                if (API_KEY === "YOUR_GEMINI_API_KEY_HERE" || !API_KEY) {
+                    return "Error: API key is missing. Please replace 'YOUR_GEMINI_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
+                }
+                try {
+                    const response = await fetch(GEMINI_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+                    });
 
-                useEffect(() => {
-                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-                }, [messages]);
-
-                // Helper function to call the Gemini API directly
-                const callApi = async (prompt) => {
-                    try {
-                        const response = await fetch(GEMINI_API_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
-                        });
-
-                        if (!response.ok) {
-                            const errorResult = await response.json();
-                            console.error("Gemini API Error:", errorResult);
-                            return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
-                        }
-
-                        const result = await response.json();
-                        return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
-
-                    } catch (error) {
-                        console.error(`Network or fetch error: ${error}`);
-                        return "I'm having trouble connecting. Please check your network connection and API key.";
+                    if (!response.ok) {
+                        const errorResult = await response.json();
+                        console.error("Gemini API Error:", errorResult);
+                        return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
                     }
-                };
 
-                const generateOptimizedPsychPrompt = async (userInput) => {
-                    const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-                    if (userInput.split(' ').length <= 3 && simpleGreetings.includes(userInput.toLowerCase().trim())) {
-                        return "SIMPLE_GREETING";
-                    }
-                    const promptForDirection = `You are an expert prompt engineer for a psychology chatbot. Convert the user's input into a refined, insightful, and precise psychological "direction". This direction should distill the core psychological essence and potential underlying issues. If the input is vague, provide a direction that encourages clarifying questions.
-                    **User Input:** "${userInput}"
-                    **Final Direction:**`;
-                    return callApi(promptForDirection);
-                };
+                    const result = await response.json();
+                    return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
 
-                const getPsychBotResponse = async (optimizedPrompt) => {
-                    if (optimizedPrompt === "SIMPLE_GREETING") {
-                        return "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.";
-                    }
-                    const isInitialAssessmentNeeded = optimizedPrompt.startsWith("INITIAL_ASSESSMENT_NEEDED:");
-                    let finalPrompt;
-                    if (isInitialAssessmentNeeded) {
-                        const coreDirection = optimizedPrompt.substring("INITIAL_ASSESSMENT_NEEDED:".length).trim();
-                        finalPrompt = `You are an expert, empathetic therapist. The user needs an initial assessment based on: "${coreDirection}". Your response must:
-                        1.  Start with empathy and validation.
-                        2.  Briefly explain potential psychological underpinnings of their symptoms.
-                        3.  Ask thoughtful, open-ended probing questions to guide the user.
-                        4.  Use clear, natural paragraphs and markdown for emphasis.`;
-                    } else {
-                        finalPrompt = `You are an expert, empathetic therapist providing psychoanalysis based on the focus: "${optimizedPrompt}". Your response must:
-                        1.  Use a compassionate, understanding, and gently challenging tone.
-                        2.  Offer sharp insights into deeper psychological principles (cognitive distortions, attachment theory, etc.) without complex jargon.
-                        3.  Provide actionable self-reflection prompts.
-                        4.  Maintain a conversational flow with clear paragraphs.`;
-                    }
-                    return callApi(finalPrompt);
-                };
-
-                const handleSendMessage = async (e) => {
-                    e.preventDefault();
-                    const userQuery = inputValue.trim();
-                    if (!userQuery) return;
-
-                    setMessages(prev => [...prev, { text: userQuery, sender: 'user' }]);
-                    setInputValue('');
-                    setIsLoading(true);
-
-                    try {
-                        const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
-                        if (!optimizedPromptDirection.startsWith("Error:") && !optimizedPromptDirection.startsWith("I'm having trouble")) {
-                             if (optimizedPromptDirection !== "SIMPLE_GREETING") {
-                                setMessages(prev => [...prev, { text: `**System Thought:** Focusing on: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
-                             }
-                             const botResponse = await getPsychBotResponse(optimizedPromptDirection);
-                             setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
-                        } else {
-                            setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
-                        }
-                    } catch (error) {
-                        console.error("Error processing message:", error);
-                        setMessages(prev => [...prev, { text: "Oops! Something went wrong. Please try again.", sender: 'bot' }]);
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-
-                const analyzeLastMessageSentiment = async () => {
-                    const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
-                    if (!lastUserMessage) return;
-                    setIsAnalyzing(true);
-                    const prompt = `Analyze the primary and underlying emotions in the following text. Consider potential psychological "blind spots". Provide a concise description and an empathetic insight. Start with "**Emotion & Insight:**".
-                    **Text:** "${lastUserMessage.text}"`;
-                    
-                    const analysis = await callApi(prompt);
-                    setMessages(prev => [...prev, { text: `✨ ${analysis}`, sender: 'bot' }]);
-                    setIsAnalyzing(false);
-                };
-
-                const suggestCopingStrategy = async () => {
-                    const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
-                    if (!lastUserMessage) return;
-                    setIsSuggesting(true);
-                    const prompt = `Based on the user statement, suggest a simple, evidence-based psychological coping strategy or self-care tip. Make it actionable and encouraging. Start with "**Coping Tip & Self-Observation:**".
-                    **User Statement:** "${lastUserMessage.text}"`;
-                    
-                    const strategy = await callApi(prompt);
-                    setMessages(prev => [...prev, { text: `🌱 ${strategy}`, sender: 'bot' }]);
-                    setIsSuggesting(false);
-                };
-
-                return (
-                    <div className="full-page-container">
-                        <div className="chat-container">
-                             <div className="header-bg">
-                                <div className="header-content">
-                                    <img src="logo.png" alt="Logo" className="logo-symbol"/>
-                                    <div>
-                                        <h1 className="header-title">Psychology Insights</h1>
-                                        <p className="header-subtitle">Your AI Companion for Well-being</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3">
-                                {messages.length === 0 ? (
-                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center p-4">
-                                        <img src="logo.png" alt="Logo" className="logo-welcome-subtle"/>
-                                        <p className="text-xl font-medium font-lora text-gray-700">Explore your mind with AI.</p>
-                                        <p className="text-md mt-2 font-poppins text-gray-600">Ask about theories, analyze feelings, or discover coping strategies.</p>
-                                    </div>
-                                ) : (
-                                    messages.map((msg, index) => (
-                                        <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`max-w-[75%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
-                                                <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                                {(isLoading || isAnalyzing || isSuggesting) && (
-                                    <div className="flex justify-start">
-                                        <div className="max-w-[80%] px-4 py-2 rounded-xl">
-                                            <div className="dot-pulse"><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div></div>
-                                        </div>
-                                    </div>
-                                )}
-                                <div ref={messagesEndRef}></div>
-                            </div>
-                            
-                            <form onSubmit={handleSendMessage} className="p-4 sm:p-5 bg-white border-t border-gray-100 flex items-center gap-3">
-                                <div className="flex-1">
-                                    <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Type your thoughts here..." className="input-field w-full" disabled={isLoading || isAnalyzing || isSuggesting}/>
-                                </div>
-                                <button type="submit" className="send-button text-white" disabled={isLoading || isAnalyzing || isSuggesting || !inputValue.trim()}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" /></svg>
-                                </button>
-                            </form>
-                            
-                            <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex justify-center gap-4 flex-wrap">
-                                <button onClick={analyzeLastMessageSentiment} className="feature-button bg-blue-600 hover:bg-blue-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
-                                    ✨ Analyze Feelings
-                                </button>
-                                <button onClick={suggestCopingStrategy} className="feature-button bg-green-600 hover:bg-green-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
-                                    🌱 Coping Tips
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                );
+                } catch (error) {
+                    console.error(`Network or fetch error: ${error}`);
+                    return "I'm having trouble connecting. Please check your network connection and API key.";
+                }
             };
 
-            const root = createRoot(document.getElementById('root'));
-            root.render(<App />);
-        });
+            const generateOptimizedPsychPrompt = async (userInput) => {
+                const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
+                if (userInput.split(' ').length <= 3 && simpleGreetings.includes(userInput.toLowerCase().trim())) {
+                    return "SIMPLE_GREETING";
+                }
+                const promptForDirection = `You are an expert prompt engineer for a psychology chatbot. Convert the user's input into a refined, insightful, and precise psychological "direction". This direction should distill the core psychological essence and potential underlying issues. If the input is vague, provide a direction that encourages clarifying questions.\n**User Input:** "${userInput}"\n**Final Direction:**`;
+                return callApi(promptForDirection);
+            };
+
+            const getPsychBotResponse = async (optimizedPrompt) => {
+                if (optimizedPrompt === "SIMPLE_GREETING") {
+                    return "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.";
+                }
+                let finalPrompt = `You are an expert, empathetic therapist providing psychoanalysis based on the focus: "${optimizedPrompt}". Your response must use a compassionate, understanding tone, offer sharp insights into deeper psychological principles (like cognitive distortions, attachment theory) without complex jargon, provide actionable self-reflection prompts, and maintain a conversational flow.`;
+                return callApi(finalPrompt);
+            };
+
+            const handleSendMessage = async (e) => {
+                e.preventDefault();
+                const userQuery = inputValue.trim();
+                if (!userQuery) return;
+
+                setMessages(prev => [...prev, { text: userQuery, sender: 'user' }]);
+                setInputValue('');
+                setIsLoading(true);
+
+                try {
+                    const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
+                    if (!optimizedPromptDirection.startsWith("Error:") && !optimizedPromptDirection.startsWith("I'm having trouble")) {
+                         if (optimizedPromptDirection !== "SIMPLE_GREETING") {
+                            setMessages(prev => [...prev, { text: `**System Thought:** Focusing on: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
+                         }
+                         const botResponse = await getPsychBotResponse(optimizedPromptDirection);
+                         setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
+                    } else {
+                        setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
+                    }
+                } catch (error) {
+                    console.error("Error processing message:", error);
+                    setMessages(prev => [...prev, { text: "Oops! Something went wrong. Please try again.", sender: 'bot' }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            const analyzeLastMessageSentiment = async () => {
+                const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
+                if (!lastUserMessage) return;
+                setIsAnalyzing(true);
+                const prompt = `Analyze the primary and underlying emotions in the following text. Consider potential psychological "blind spots". Provide a concise description and an empathetic insight. Start with "**Emotion & Insight:**".\n**Text:** "${lastUserMessage.text}"`;
+                
+                const analysis = await callApi(prompt);
+                setMessages(prev => [...prev, { text: `✨ ${analysis}`, sender: 'bot' }]);
+                setIsAnalyzing(false);
+            };
+
+            const suggestCopingStrategy = async () => {
+                const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
+                if (!lastUserMessage) return;
+                setIsSuggesting(true);
+                const prompt = `Based on the user statement, suggest a simple, evidence-based psychological coping strategy or self-care tip. Make it actionable and encouraging. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
+                
+                const strategy = await callApi(prompt);
+                setMessages(prev => [...prev, { text: `🌱 ${strategy}`, sender: 'bot' }]);
+                setIsSuggesting(false);
+            };
+
+            return (
+                <div className="full-page-container">
+                    <div className="chat-container">
+                         <div className="header-bg">
+                            <div className="header-content">
+                                <img src="logo.png" alt="Logo" className="logo-symbol"/>
+                                <div>
+                                    <h1 className="header-title">Psychology Insights</h1>
+                                    <p className="header-subtitle">Your AI Companion for Well-being</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3">
+                            {messages.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center p-4">
+                                    <img src="logo.png" alt="Logo" className="logo-welcome-subtle"/>
+                                    <p className="text-xl font-medium font-lora text-gray-700">Explore your mind with AI.</p>
+                                    <p className="text-md mt-2 font-poppins text-gray-600">Ask about theories, analyze feelings, or discover coping strategies.</p>
+                                </div>
+                            ) : (
+                                messages.map((msg, index) => (
+                                    <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                        <div className={`max-w-[75%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
+                                            <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                            {(isLoading || isAnalyzing || isSuggesting) && (
+                                <div className="flex justify-start">
+                                    <div className="max-w-[80%] px-4 py-2 rounded-xl">
+                                        <div className="dot-pulse"><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div></div>
+                                    </div>
+                                </div>
+                            )}
+                            <div ref={messagesEndRef}></div>
+                        </div>
+                        
+                        <form onSubmit={handleSendMessage} className="p-4 sm:p-5 bg-white border-t border-gray-100 flex items-center gap-3">
+                            <div className="flex-1">
+                                <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Type your thoughts here..." className="input-field w-full" disabled={isLoading || isAnalyzing || isSuggesting}/>
+                            </div>
+                            <button type="submit" className="send-button text-white" disabled={!inputValue.trim() || isLoading || isAnalyzing || isSuggesting}>
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" /></svg>
+                            </button>
+                        </form>
+                        
+                        <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex justify-center gap-4 flex-wrap">
+                            <button onClick={analyzeLastMessageSentiment} className="feature-button bg-blue-600 hover:bg-blue-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                                ✨ Analyze Feelings
+                            </button>
+                            <button onClick={suggestCopingStrategy} className="feature-button bg-green-600 hover:bg-green-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                                🌱 Coping Tips
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // This is the standard and correct way to render a React App.
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+
     </script>
 </body>
 </html>
