@@ -24,7 +24,6 @@
         .header-subtitle{font-family:'Poppins',sans-serif;font-size:0.95rem;opacity:0.9;}
         .chat-message-user{background-color:var(--bubble-user);color:var(--text-dark);border-radius:1rem;border-bottom-right-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
         .chat-message-bot{background-color:var(--bubble-bot);color:var(--text-dark);border-radius:1rem;border-bottom-left-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
-        .chat-message-system-thought{background-color:var(--system-info);color:var(--text-dark);font-size:0.85rem;font-style:italic;border-radius:0.75rem;border-left:5px solid var(--border-light);padding-left:1.2rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
         .input-field{border:1px solid var(--border-light);border-radius:9999px;padding:0.8rem 1.6rem;transition:all 0.2s;box-shadow:inset 0 1px 2px rgba(0,0,0,0.04);font-size:1rem;color:var(--text-dark);}
         .input-field:focus{outline:none;border-color:var(--accent-green);box-shadow:0 0 0 3px rgba(39,174,96,0.2);}
         .send-button{background-color:var(--accent-green);border-radius:9999px;width:60px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px var(--shadow-light);transition:all 0.2s;flex-shrink:0;}
@@ -59,15 +58,14 @@
             const messagesEndRef = useRef(null);
 
             // ===========================================================================================
-            // !!! ----------------------------- API KEY & MODEL CONFIGURATION ----------------------- !!!
+            // API KEY & MODEL CONFIGURATION
             //
-            //   1. Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
-            //   2. MODEL CORRECTION: Reverted to "gemini-1.5-flash-latest" as it's the correct model
-            //      for the standard free-tier API key, preventing quota errors.
+            // 1. Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
+            // 2. We are using "gemini-1.5-flash-latest" as it is the correct model for the free tier.
             //
             // ===========================================================================================
             const API_KEY = "AIzaSyDgBe4ibRkgIyAyTFkZuV8uiPMbIrKwRfU"; // <-- REPLACE WITH YOUR REAL KEY
-            const MODEL_NAME = "gemini-1.5-flash-latest"; // Correct model for the free tier
+            const MODEL_NAME = "gemini-1.5-flash-latest";
             const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
 
             useEffect(() => {
@@ -78,7 +76,6 @@
                 if (API_KEY === "YOUR_API_KEY_HERE" || !API_KEY) {
                     return "Error: API key is missing. Please replace 'YOUR_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
                 }
-
                 for (let i = 0; i < retries; i++) {
                     try {
                         const response = await fetch(GEMINI_API_URL, {
@@ -86,22 +83,18 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
                         });
-
                         if (!response.ok && response.status >= 500) { throw new Error(`Server error: ${response.status}`); }
-                        
                         if (!response.ok) {
                             const errorResult = await response.json();
                             return `Error: ${errorResult.error?.message || 'API request failed.'}`;
                         }
-                        
                         const result = await response.json();
                         if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
                             return result.candidates[0].content.parts[0].text;
                         } else {
                             console.error("API returned success but no content:", result);
-                            return "I received an unusual response from the model. It might be due to a safety filter or an internal issue. Please try rephrasing your query.";
+                            return "I received an unusual response from the model, possibly due to a safety filter. Please try rephrasing your query.";
                         }
-
                     } catch (error) {
                         console.error(`Attempt ${i + 1} failed: ${error}.`);
                         if (i === retries - 1) { return "Error: The model seems to be overloaded. Please try again in a moment."; }
@@ -120,60 +113,63 @@
                 setInputValue('');
                 setIsLoading(true);
 
-                // --- PROMPT ENGINEERING v4: UPGRADED ACADEMIC MODE ---
+                // --- PROMPT ENGINEERING v5: ROBUST, SINGLE-CALL LOGIC ---
 
-                let academicPrompt = `
-                    **Persona:** You are a synthesis of a seasoned clinical psychologist, a university professor of psychology, and a meticulous researcher. Your knowledge is vast, spanning the entire history of psychological thought, from Freudian psychoanalysis to modern neuroscience-informed therapies. You are a master of synthesis.
-                    **Task:** Provide a comprehensive, multi-faceted psychoanalytic exploration of the user's query. Your response MUST be extensive, detailed, and well-structured, comparable to a detailed encyclopedia entry or a short, accessible literature review. It should be significantly longer and more detailed than a simple answer.
-                    **Content Requirements (Follow this structure strictly):**
-                    1.  **Introduction & Deconstruction:** Briefly deconstruct the user's query into its core psychological components.
-                    2.  **Survey of Major Theories:** Systematically survey AT LEAST THREE major psychological schools of thought as they apply to the query. You MUST name the schools (e.g., Psychodynamic, Cognitive-Behavioral (CBT), Humanistic, Attachment Theory, etc.) and explain their perspective on the issue.
-                    3.  **Deep Dive into Nuanced Concepts:** Explore specific, relevant concepts in detail. You MUST define these concepts (e.g., name specific cognitive distortions like 'catastrophizing', name defense mechanisms like 'projection', or discuss concepts like 'core beliefs', 'schemas', or 'existential anxiety').
-                    4.  **Discussion of Contributing Factors:** Consider and discuss potential differential explanations or contributing factors (e.g., biological predispositions, environmental/social factors, past experiences/trauma).
-                    5.  **Concluding Synthesis:** End with a powerful synthesis that integrates these varied perspectives, providing a holistic and insightful understanding of the topic for the user.
-                    **Style:** Use a clear, objective, and educational tone. You MUST use markdown (bolding for key terms, bullet points for lists) to ensure the structure is clear and academically rigorous.
+                const academicPrompt = `
+                    **Persona:** You are a unique AI, a synthesis of a seasoned clinical psychologist and a university professor of psychology. You are a master of synthesis, capable of drawing connections between disparate fields of psychological thought. Your primary goal is to educate the user by providing a comprehensive, multi-faceted psychoanalytic exploration of their query.
+
+                    **Core Task:** For the user's query, you MUST generate a response that is structured like a detailed, accessible literature review. Your response MUST be comprehensive, detailed, and significantly longer than a typical chatbot answer. It must be well-organized with clear headings for each section.
+
+                    **Mandatory Response Structure (Use Markdown headings for each section):**
+
+                    ### 1. Introduction and Deconstruction
+                    Start by briefly reframing the user's query into its core psychological question, demonstrating a deep understanding of the underlying issue.
+
+                    ### 2. Psychodynamic Perspective
+                    Analyze the query from a psychodynamic viewpoint. Discuss relevant concepts such as unconscious conflicts, defense mechanisms (you MUST **bold** and define specific mechanisms like projection, displacement, or intellectualization), and the potential influence of early life experiences.
+
+                    ### 3. Cognitive-Behavioral (CBT) Perspective
+                    Next, analyze the query from a CBT viewpoint. Identify and discuss the interplay of thoughts, feelings, and behaviors. You MUST identify potential **cognitive distortions** (e.g., catastrophizing, black-and-white thinking), explain what they are, and how they might apply. Discuss the concept of core beliefs.
+
+                    ### 4. Humanistic or Existential Perspective
+                    Provide a third perspective from a Humanistic or Existential viewpoint. Discuss concepts like self-actualization, conditions of worth, the search for meaning, or existential anxieties as they relate to the user's query.
+
+                    ### 5. Concluding Synthesis
+                    Conclude with a powerful synthesis that integrates the insights from all three perspectives. Explain how these different schools of thought are not mutually exclusive but can provide a more holistic and complete understanding of the user's experience.
                 `;
 
-                let conversationalPrompt = `
-                    **Persona:** Act as an exceptionally empathetic, warm, and insightful therapist in a live session.
-                    **Task:** Help the user feel understood and gently guide them toward self-reflection. Create a safe, non-judgmental space.
-                    **Content Requirements:**
-                    1.  **Validate Feelings:** Start by deeply validating the user's emotions. Show you understand not just *what* they feel, but *why* it makes sense for them to feel that way.
-                    2.  **Introduce Concepts Simply:** You can mention psychological concepts (like 'the inner critic' or 'cognitive distortions'), but you must explain them in simple, relatable, everyday terms without using academic jargon.
-                    3.  **Ask Guiding Questions:** Pose gentle, open-ended, Socratic questions to encourage the user to explore their own thoughts and feelings more deeply. The goal is to foster their own insight.
-                    4.  **Prioritize Connection:** The goal is connection and self-discovery, not a lecture. Use "you" and "I" to foster a personal, supportive relationship.
+                const conversationalPrompt = `
+                    **Persona:** Act as an exceptionally empathetic, warm, and insightful therapist. Your goal is to make the user feel seen, heard, and safe.
+                    **Task:** Your response should be a gentle, guided conversation.
+                    **Content and Style:**
+                    1.  **Deep Validation:** Start by deeply validating the user's feelings. Show that you understand the emotional weight of their situation. For example, instead of "that sounds hard," say "It makes complete sense that you would feel overwhelmed by that; it's a heavy burden to carry."
+                    2.  **Simple Concepts:** If you introduce a psychological idea (like an 'inner critic'), explain it simply and immediately tie it back to their experience.
+                    3.  **Guiding Questions:** End your response with a gentle, open-ended question that invites introspection, such as "What does that little voice of self-doubt usually tell you in these moments?" or "I'm curious, what do you imagine the best-case scenario could look like, even if it feels far away?"
                 `;
 
-                let masterPrompt = `
-                    You are an expert AI assistant specializing in psychology. A user has sent a query. Your task is to respond based on the specified mode.
-
-                    USER QUERY: "${userQuery}"
-                    RESPONSE MODE: "${responseMode}"
-
-                    **INSTRUCTIONS:**
-                    Your response MUST be structured in two parts using specific tags:
-                    1.  [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT]: Provide a concise, insightful summary of the core psychological theme in the user's query.
-                    2.  [FINAL_RESPONSE]...[/FINAL_RESPONSE]: Provide the main answer to the user, strictly following the persona and content instructions for the selected RESPONSE MODE below.
+                // This unified prompt tells the AI its persona based on the selected mode.
+                const masterPrompt = `
+                    You are an expert AI assistant specializing in psychology. Your persona and response style are determined by the **RESPONSE MODE** provided.
+                    **USER QUERY:** "${userQuery}"
+                    **RESPONSE MODE:** "${responseMode}"
 
                     ---
-                    **MODE-SPECIFIC INSTRUCTIONS:**
-                    ${responseMode === 'academic' ? academicPrompt : conversationalPrompt}
+                    **INSTRUCTIONS FOR YOUR TASK:**
+                    Based *only* on the RESPONSE MODE provided above, adopt the corresponding persona and follow its instructions to the letter to answer the USER QUERY. Do not blend the modes. Produce only the final response.
+
                     ---
-                    Begin your response now.
+                    **MODE-SPECIFIC INSTRUCTIONS LIBRARY:**
+
+                    **If RESPONSE MODE is "conversational":**
+                    ${conversationalPrompt}
+
+                    **If RESPONSE MODE is "academic":**
+                    ${academicPrompt}
                 `;
                 
-                const fullResponse = await callApiWithRetries(masterPrompt);
-
-                const systemThoughtMatch = fullResponse.match(/\[SYSTEM_THOUGHT\](.*?)\[\/SYSTEM_THOUGHT\]/s);
-                const finalResponseMatch = fullResponse.match(/\[FINAL_RESPONSE\](.*?)\[\/FINAL_RESPONSE\]/s);
-
-                const systemThought = systemThoughtMatch ? systemThoughtMatch[1].trim() : null;
-                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : "I apologize, but I had trouble structuring my response. Could you please try rephrasing?"; 
-
-                if (systemThought) {
-                    setMessages(prev => [...prev, { text: `**System Thought:** ${systemThought}`, sender: 'system-thought' }]);
-                }
-                setMessages(prev => [...prev, { text: finalResponse, sender: 'bot' }]);
+                const botResponse = await callApiWithRetries(masterPrompt);
+                
+                setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
                 
                 setIsLoading(false);
             };
@@ -183,7 +179,6 @@
                 if (!lastUserMessage) return;
                 
                 setIsLoading(true);
-
                 let specificPrompt = type === 'analyze'
                     ? `Based on the user's last statement, provide a concise sentiment analysis and psychological insight. Start with "**Emotion & Insight:**".\n**User Statement:** "${lastUserMessage.text}"`
                     : `Based on the user's last statement, suggest a simple, evidence-based coping strategy. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
@@ -226,7 +221,7 @@
                             ) : (
                                 messages.map((msg, index) => (
                                     <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[85%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
+                                        <div className={`max-w-[85%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : 'chat-message-bot'}`}>
                                             <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
                                         </div>
                                     </div>
@@ -263,4 +258,12 @@
 
     </script>
 </body>
-</html>
+</html>```
+
+### **Final Checklist**
+
+1.  **Replace `index.html`:** Use this new, definitive code for your `index.html` file.
+2.  **Insert Your API Key:** Find the line `const API_KEY = "YOUR_API_KEY_HERE";` and insert your personal, valid Gemini API key.
+3.  **Save and Run:** Save the file and open it in your browser.
+
+Now, test it with the same procrastination question in **Academic Mode**. The result should be a night-and-day difference. You should receive a long, well-structured, multi-part essay that covers different psychological schools of thought and provides the expert-level detail you were looking for, all while being much more reliable.
