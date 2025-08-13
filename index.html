@@ -22,26 +22,24 @@
         .logo-symbol{height:50px;width:50px;border-radius:50%;box-shadow:0 3px 10px var(--shadow-medium);object-fit:cover;background-color:white;}
         .header-title{font-family:'Lora',serif;font-size:1.8rem;font-weight:700;letter-spacing:-0.03em;text-shadow:1px 1px 3px rgba(0,0,0,0.2);}
         .header-subtitle{font-family:'Poppins',sans-serif;font-size:0.95rem;opacity:0.9;}
-        .logo-welcome-subtle{height:100px;width:100px;opacity:0.4;margin-bottom:1.5rem;object-fit:contain;}
         .chat-message-user{background-color:var(--bubble-user);color:var(--text-dark);border-radius:1rem;border-bottom-right-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
         .chat-message-bot{background-color:var(--bubble-bot);color:var(--text-dark);border-radius:1rem;border-bottom-left-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
         .chat-message-system-thought{background-color:var(--system-info);color:var(--text-dark);font-size:0.85rem;font-style:italic;border-radius:0.75rem;border-left:5px solid var(--border-light);padding-left:1.2rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
-        .chat-message-bot p,.chat-message-user p,.chat-message-system-thought p{margin-bottom:0.5em;line-height:1.6;white-space:pre-wrap;}
-        .chat-message-bot p:last-child,.chat-message-user p:last-child,.chat-message-system-thought p:last-child{margin-bottom:0;}
-        .input-field{border:1px solid var(--border-light);border-radius:9999px;padding:0.8rem 1.6rem;transition:border-color 0.2s ease-in-out,box-shadow 0.2s ease-in-out;box-shadow:inset 0 1px 2px rgba(0,0,0,0.04);font-size:1rem;color:var(--text-dark);}
+        .input-field{border:1px solid var(--border-light);border-radius:9999px;padding:0.8rem 1.6rem;transition:all 0.2s;box-shadow:inset 0 1px 2px rgba(0,0,0,0.04);font-size:1rem;color:var(--text-dark);}
         .input-field:focus{outline:none;border-color:var(--accent-green);box-shadow:0 0 0 3px rgba(39,174,96,0.2);}
-        .send-button{background-color:var(--accent-green);border-radius:9999px;width:60px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px var(--shadow-light);transition:background-color 0.3s ease,transform 0.2s ease;flex-shrink:0;}
+        .send-button{background-color:var(--accent-green);border-radius:9999px;width:60px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px var(--shadow-light);transition:all 0.2s;flex-shrink:0;}
         .send-button:hover{background-color:#2ecc71;transform:scale(1.05);box-shadow:0 3px 8px var(--shadow-medium);}
-        .feature-button{font-weight:500;padding:0.7rem 1.4rem;border-radius:9999px;box-shadow:0 2px 5px var(--shadow-light);transition:all 0.2s ease-in-out;color:var(--text-light);display:flex;align-items:center;gap:0.6rem;font-size:0.9rem;}
+        .feature-button{font-weight:500;padding:0.7rem 1.4rem;border-radius:9999px;box-shadow:0 2px 5px var(--shadow-light);transition:all 0.2s;color:var(--text-light);display:flex;align-items:center;gap:0.6rem;font-size:0.9rem;}
         .feature-button:hover{transform:translateY(-1px);box-shadow:0 3px 7px var(--shadow-medium);}
-        .dot-pulse{display:flex;align-items:center;justify-content:center;}
+        .dot-pulse{display:flex;align-items:center;justify-content:center;padding:1rem;}
         .dot-pulse-dot{width:8px;height:8px;background-color:var(--primary-blue);border-radius:50%;margin:0 4px;animation:dotPulse 1.2s infinite ease-in-out;}
-        .dot-pulse-dot:nth-child(1){animation-delay:0s;}
-        .dot-pulse-dot:nth-child(2){animation-delay:0.15s;}
-        .dot-pulse-dot:nth-child(3){animation-delay:0.3s;}
+        .dot-pulse-dot:nth-child(1){animation-delay:0s;} .dot-pulse-dot:nth-child(2){animation-delay:0.15s;} .dot-pulse-dot:nth-child(3){animation-delay:0.3s;}
         @keyframes dotPulse{0%,100%{transform:scale(0.7);opacity:0.7;}50%{transform:scale(1);opacity:1;}}
-        @keyframes fadeInDown{from{opacity:0;transform:translateY(-15px);}to{opacity:1;transform:translateY(0);}}
-        @keyframes fadeInUp{from{opacity:0;transform:translateY(15px);}to{opacity:1;transform:translateY(0);}}
+        .mode-toggle-bg{background-color:#e0e7ff;padding:0.25rem;border-radius:9999px;display:flex;position:relative;}
+        .mode-toggle-button{padding:0.5rem 1rem;font-size:0.875rem;font-weight:500;border-radius:9999px;cursor:pointer;transition:color 0.3s;z-index:1;border:none;background:none;}
+        .mode-toggle-button.active{color:var(--primary-blue);}
+        .mode-toggle-button.inactive{color:#6b7280;}
+        .mode-toggle-glider{position:absolute;top:0.25rem;bottom:0.25rem;width:calc(50% - 0.25rem);background-color:white;border-radius:9999px;box-shadow:0 1px 3px rgba(0,0,0,0.1);transition:transform 0.3s ease;}
     </style>
 </head>
 <body>
@@ -56,6 +54,7 @@
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
+            const [responseMode, setResponseMode] = useState('conversational'); // 'conversational' or 'academic'
             
             const messagesEndRef = useRef(null);
 
@@ -78,10 +77,7 @@
                 messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }, [messages]);
             
-            /**
-             * A resilient API call function with automatic retries for server errors.
-             */
-            const callApiWithRetries = async (prompt, retries = 3, delay = 1000) => {
+            const callApiWithRetries = async (prompt, retries = 2, delay = 1500) => {
                 if (API_KEY === "YOUR_API_KEY_HERE" || !API_KEY) {
                     return "Error: API key is missing. Please replace 'YOUR_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
                 }
@@ -94,13 +90,11 @@
                             body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
                         });
 
-                        if (!response.ok && response.status >= 500) {
-                            throw new Error(`Server error: ${response.status}`);
-                        }
+                        if (!response.ok && response.status >= 500) { throw new Error(`Server error: ${response.status}`); }
                         
                         if (!response.ok) {
                             const errorResult = await response.json();
-                            return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
+                            return `Error: ${errorResult.error?.message || 'API request failed.'}`;
                         }
                         
                         const result = await response.json();
@@ -108,9 +102,7 @@
 
                     } catch (error) {
                         console.error(`Attempt ${i + 1} failed: ${error}.`);
-                        if (i === retries - 1) {
-                            return "Error: The model seems to be overloaded or unavailable after multiple attempts. Please try again later.";
-                        }
+                        if (i === retries - 1) { return "Error: The model seems to be overloaded. Please try again in a moment."; }
                         await new Promise(resolve => setTimeout(resolve, delay));
                         delay *= 2;
                     }
@@ -126,38 +118,41 @@
                 setInputValue('');
                 setIsLoading(true);
 
-                // Handle simple greetings locally without an API call
-                const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-                if (simpleGreetings.includes(userQuery.toLowerCase())) {
-                    setMessages(prev => [...prev, { text: "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.", sender: 'bot' }]);
-                    setIsLoading(false);
-                    return;
-                }
+                // --- NEW EFFICIENT PROMPT ENGINEERING ---
+                let masterPrompt = `
+                    You are an expert AI assistant specializing in psychology. A user has sent a query. Your task is to respond based on the specified mode.
 
-                // NEW EFFICIENT LOGIC: A single prompt for both thought and response
-                const masterPrompt = `
-                    You are an expert, empathetic therapist AI. A user has sent the following query.
                     USER QUERY: "${userQuery}"
+                    RESPONSE MODE: "${responseMode}"
 
-                    YOUR TASK:
-                    Respond in two distinct parts, enclosed in specific tags.
-                    1.  First, create a "system thought" where you rephrase the user's query into its core psychological concept. This should be concise and insightful. Enclose this part in [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT] tags.
-                    2.  Second, write your full, empathetic, and insightful therapeutic response to the user. Address the core concept you identified. Offer psychoanalytic insights (like cognitive distortions, attachment styles) in simple terms, and provide gentle prompts for self-reflection. Enclose this part in [FINAL_RESPONSE]...[/FINAL_RESPONSE] tags.
+                    **INSTRUCTIONS:**
+                    Regardless of the mode, your response MUST be structured in two parts using specific tags:
+                    1.  **System Thought:** First, provide a concise, insightful summary of the core psychological concept or theme in the user's query. Enclose this summary in [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT] tags.
+                    2.  **Final Response:** Second, provide the main answer to the user. The style of this answer depends entirely on the RESPONSE MODE. Enclose the entire answer in [FINAL_RESPONSE]...[/FINAL_RESPONSE] tags.
 
-                    EXAMPLE:
-                    USER QUERY: "why do i feel bad about getting bad grades in this particular subject?"
-                    YOUR RESPONSE:
-                    [SYSTEM_THOUGHT]Focusing on: The connection between academic performance, self-worth, and subject-specific anxiety.[/SYSTEM_THOUGHT][FINAL_RESPONSE]It's completely understandable to feel bad when you don't meet your own expectations in a subject, especially if it's one you care about. This feeling often isn't just about the grade itself, but what we subconsciously tie to it—things like our intelligence, our future success, or how others see us. This can be a form of **catastrophizing**, a cognitive distortion where we jump to the worst possible conclusion. A helpful question to ask yourself is: "What story am I telling myself about what this grade means about me?" Exploring that can often reveal the true source of the pain. It's rarely just about the letter on the page.[/FINAL_RESPONSE]
+                    **MODE-SPECIFIC INSTRUCTIONS:**
+
+                    A) If RESPONSE MODE is "conversational":
+                       -   **Persona:** Act as an exceptionally empathetic, warm, and insightful therapist.
+                       -   **Tone:** Use a supportive, validating, and gentle tone. Use "you" and "I" to create a personal connection.
+                       -   **Content:** Your goal is to help the user feel understood and to gently guide them toward self-reflection. You can mention psychological concepts (like 'cognitive distortions'), but explain them in simple, relatable terms. Ask open-ended questions to encourage deeper thought. Prioritize emotional validation over academic lecturing.
+
+                    B) If RESPONSE MODE is "academic":
+                       -   **Persona:** Act as a knowledgeable and clear psychology professor or researcher.
+                       -   **Tone:** Use an objective, educational, and structured tone.
+                       -   **Content:** Your goal is to provide a detailed and thorough explanation. Explicitly name, define, and explain relevant psychological theories, studies, and concepts (e.g., Attachment Theory, Cognitive Behavioral Therapy, confirmation bias). Use formatting like markdown bolding and bullet points to organize complex information clearly. The response should be longer and more comprehensive than the conversational one.
+
+                    ---
+                    Begin your response now.
                 `;
-
+                
                 const fullResponse = await callApiWithRetries(masterPrompt);
 
-                // Parse the response to separate the system thought and final response
                 const systemThoughtMatch = fullResponse.match(/\[SYSTEM_THOUGHT\](.*?)\[\/SYSTEM_THOUGHT\]/s);
                 const finalResponseMatch = fullResponse.match(/\[FINAL_RESPONSE\](.*?)\[\/FINAL_RESPONSE\]/s);
 
                 const systemThought = systemThoughtMatch ? systemThoughtMatch[1].trim() : null;
-                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : fullResponse; // Fallback to full response if parsing fails
+                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : fullResponse;
 
                 if (systemThought) {
                     setMessages(prev => [...prev, { text: `**System Thought:** ${systemThought}`, sender: 'system-thought' }]);
@@ -167,19 +162,15 @@
                 setIsLoading(false);
             };
             
-            // This function is now simplified and only calls the master prompt logic
             const analyzeAndSuggest = async (type) => {
                 const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
                 if (!lastUserMessage) return;
                 
                 setIsLoading(true);
 
-                let specificPrompt;
-                if (type === 'analyze') {
-                    specificPrompt = `Based on the user's last statement, provide a concise sentiment analysis and psychological insight. Start with "**Emotion & Insight:**".\n**User Statement:** "${lastUserMessage.text}"`;
-                } else {
-                    specificPrompt = `Based on the user's last statement, suggest a simple, evidence-based coping strategy. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
-                }
+                let specificPrompt = type === 'analyze'
+                    ? `Based on the user's last statement, provide a concise sentiment analysis and psychological insight. Start with "**Emotion & Insight:**".\n**User Statement:** "${lastUserMessage.text}"`
+                    : `Based on the user's last statement, suggest a simple, evidence-based coping strategy. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
                 
                 const response = await callApiWithRetries(specificPrompt);
                 const prefix = type === 'analyze' ? '✨' : '🌱';
@@ -191,7 +182,7 @@
             return (
                 <div className="full-page-container">
                     <div className="chat-container">
-                         <div className="header-bg">
+                        <div className="header-bg">
                             <div className="header-content">
                                 <img src="logo.png" alt="Logo" className="logo-symbol"/>
                                 <div>
@@ -201,29 +192,32 @@
                             </div>
                         </div>
 
+                        {/* --- NEW: Mode Toggle UI --- */}
+                        <div className="p-2 bg-slate-100 flex justify-center">
+                            <div className="mode-toggle-bg">
+                                <div className="mode-toggle-glider" style={{ transform: responseMode === 'conversational' ? 'translateX(0%)' : 'translateX(100%)' }}></div>
+                                <button onClick={() => setResponseMode('conversational')} className={`mode-toggle-button ${responseMode === 'conversational' ? 'active' : 'inactive'}`}>Conversational</button>
+                                <button onClick={() => setResponseMode('academic')} className={`mode-toggle-button ${responseMode === 'academic' ? 'active' : 'inactive'}`}>Academic</button>
+                            </div>
+                        </div>
+
                         <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3">
                             {messages.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center p-4">
                                     <img src="logo.png" alt="Logo" className="logo-welcome-subtle"/>
                                     <p className="text-xl font-medium font-lora text-gray-700">Explore your mind with AI.</p>
-                                    <p className="text-md mt-2 font-poppins text-gray-600">Ask about theories, analyze feelings, or discover coping strategies.</p>
+                                    <p className="text-md mt-2 font-poppins text-gray-600">Choose a mode above and ask a question.</p>
                                 </div>
                             ) : (
                                 messages.map((msg, index) => (
                                     <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[75%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
+                                        <div className={`max-w-[80%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
                                             <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
                                         </div>
                                     </div>
                                 ))
                             )}
-                            {isLoading && (
-                                <div className="flex justify-start">
-                                    <div className="max-w-[80%] px-4 py-2 rounded-xl">
-                                        <div className="dot-pulse"><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div></div>
-                                    </div>
-                                </div>
-                            )}
+                            {isLoading && (<div className="dot-pulse"><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div></div>)}
                             <div ref={messagesEndRef}></div>
                         </div>
                         
