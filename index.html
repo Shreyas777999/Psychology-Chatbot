@@ -48,9 +48,8 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        // This script will run after the DOM is fully loaded and parsed.
         const { useState, useEffect, useRef } = React;
-        const ReactDOM = window.ReactDOM; // Explicitly get ReactDOM from the window object
+        const ReactDOM = window.ReactDOM;
         const marked = window.marked;
 
         const App = () => {
@@ -62,14 +61,14 @@
             const messagesEndRef = useRef(null);
 
             // ===========================================================================================
-            // !!! ----------------------------- IMPORTANT API KEY CONFIGURATION ----------------------- !!!
+            // !!! ----------------------------- SECURITY & API KEY CONFIGURATION ---------------------- !!!
             //
-            //   1. Replace "YOUR_GEMINI_API_KEY_HERE" with your actual Gemini API key.
+            //   FOR YOUR PROTECTION, I have replaced your key with a placeholder.
+            //
+            //   1. Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
             //   2. Get your key from: https://aistudio.google.com/app/apikey
             //
-            //   SECURITY WARNING: This method is for LOCAL TESTING ONLY.
-            //   If you upload this file to a public website (like GitHub Pages), your key will be
-            //   exposed and can be stolen. For a live site, you must use a backend server.
+            //   WARNING: DO NOT post this file online with your real key in it.
             //
             // ===========================================================================================
             const API_KEY = "AIzaSyDgBe4ibRkgIyAyTFkZuV8uiPMbIrKwRfU"; // <-- REPLACE WITH YOUR REAL KEY
@@ -79,31 +78,51 @@
             useEffect(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }, [messages]);
-
-            const callApi = async (prompt) => {
-                // Check for a missing API key before trying to fetch
-                if (API_KEY === "YOUR_GEMINI_API_KEY_HERE" || !API_KEY) {
-                    return "Error: API key is missing. Please replace 'YOUR_GEMINI_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
+            
+            /**
+             * NEW: A more resilient API call function with automatic retries.
+             * This will automatically try again if the model is temporarily overloaded.
+             */
+            const callApiWithRetries = async (prompt, retries = 3, delay = 1000) => {
+                if (API_KEY === "YOUR_API_KEY_HERE" || !API_KEY) {
+                    return "Error: API key is missing. Please replace 'YOUR_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
                 }
-                try {
-                    const response = await fetch(GEMINI_API_URL, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
-                    });
 
-                    if (!response.ok) {
-                        const errorResult = await response.json();
-                        console.error("Gemini API Error:", errorResult);
-                        return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(GEMINI_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] })
+                        });
+
+                        // If the response is a server error (like 500, 503), throw an error to trigger a retry.
+                        if (!response.ok && response.status >= 500) {
+                            throw new Error(`Server error: ${response.status}`);
+                        }
+                        
+                        // If response is a client error (like 400), don't retry, just show the error.
+                        if (!response.ok) {
+                            const errorResult = await response.json();
+                            console.error("Gemini API Client Error:", errorResult);
+                            return `Error: ${errorResult.error?.message || 'Failed to get a valid response from the API.'}`;
+                        }
+                        
+                        // If response is successful, return the text.
+                        const result = await response.json();
+                        return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
+
+                    } catch (error) {
+                        console.error(`Attempt ${i + 1} failed: ${error}. Retrying in ${delay / 1000}s...`);
+                        // If this was the last retry, return the final error message.
+                        if (i === retries - 1) {
+                            return "Error: The model is overloaded. Please try again later.";
+                        }
+                        // Wait for the specified delay before the next attempt.
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        // Double the delay for the next retry (exponential backoff).
+                        delay *= 2;
                     }
-
-                    const result = await response.json();
-                    return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
-
-                } catch (error) {
-                    console.error(`Network or fetch error: ${error}`);
-                    return "I'm having trouble connecting. Please check your network connection and API key.";
                 }
             };
 
@@ -112,16 +131,16 @@
                 if (userInput.split(' ').length <= 3 && simpleGreetings.includes(userInput.toLowerCase().trim())) {
                     return "SIMPLE_GREETING";
                 }
-                const promptForDirection = `You are an expert prompt engineer for a psychology chatbot. Convert the user's input into a refined, insightful, and precise psychological "direction". This direction should distill the core psychological essence and potential underlying issues. If the input is vague, provide a direction that encourages clarifying questions.\n**User Input:** "${userInput}"\n**Final Direction:**`;
-                return callApi(promptForDirection);
+                const promptForDirection = `As a prompt engineer for a psychology chatbot, refine the user's input into a precise psychological "direction". Distill the core essence and underlying issues. If vague, aim for clarifying questions.\n**User Input:** "${userInput}"\n**Final Direction:**`;
+                return callApiWithRetries(promptForDirection);
             };
 
             const getPsychBotResponse = async (optimizedPrompt) => {
                 if (optimizedPrompt === "SIMPLE_GREETING") {
                     return "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.";
                 }
-                let finalPrompt = `You are an expert, empathetic therapist providing psychoanalysis based on the focus: "${optimizedPrompt}". Your response must use a compassionate, understanding tone, offer sharp insights into deeper psychological principles (like cognitive distortions, attachment theory) without complex jargon, provide actionable self-reflection prompts, and maintain a conversational flow.`;
-                return callApi(finalPrompt);
+                const finalPrompt = `As an empathetic therapist, provide a psychoanalytic response for: "${optimizedPrompt}". Use a compassionate tone, offer insights on principles like cognitive distortions without jargon, give self-reflection prompts, and maintain a conversational flow.`;
+                return callApiWithRetries(finalPrompt);
             };
 
             const handleSendMessage = async (e) => {
@@ -133,32 +152,26 @@
                 setInputValue('');
                 setIsLoading(true);
 
-                try {
-                    const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
-                    if (!optimizedPromptDirection.startsWith("Error:") && !optimizedPromptDirection.startsWith("I'm having trouble")) {
-                         if (optimizedPromptDirection !== "SIMPLE_GREETING") {
-                            setMessages(prev => [...prev, { text: `**System Thought:** Focusing on: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
-                         }
-                         const botResponse = await getPsychBotResponse(optimizedPromptDirection);
-                         setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
-                    } else {
-                        setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
-                    }
-                } catch (error) {
-                    console.error("Error processing message:", error);
-                    setMessages(prev => [...prev, { text: "Oops! Something went wrong. Please try again.", sender: 'bot' }]);
-                } finally {
-                    setIsLoading(false);
+                const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
+                if (!optimizedPromptDirection.startsWith("Error:")) {
+                     if (optimizedPromptDirection !== "SIMPLE_GREETING") {
+                        setMessages(prev => [...prev, { text: `**System Thought:** Focusing on: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
+                     }
+                     const botResponse = await getPsychBotResponse(optimizedPromptDirection);
+                     setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
+                } else {
+                    setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
                 }
+                
+                setIsLoading(false);
             };
 
             const analyzeLastMessageSentiment = async () => {
                 const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
                 if (!lastUserMessage) return;
                 setIsAnalyzing(true);
-                const prompt = `Analyze the primary and underlying emotions in the following text. Consider potential psychological "blind spots". Provide a concise description and an empathetic insight. Start with "**Emotion & Insight:**".\n**Text:** "${lastUserMessage.text}"`;
-                
-                const analysis = await callApi(prompt);
+                const prompt = `Analyze emotions in this text, including potential "blind spots". Give a concise description and empathetic insight. Start with "**Emotion & Insight:**".\n**Text:** "${lastUserMessage.text}"`;
+                const analysis = await callApiWithRetries(prompt);
                 setMessages(prev => [...prev, { text: `✨ ${analysis}`, sender: 'bot' }]);
                 setIsAnalyzing(false);
             };
@@ -167,9 +180,8 @@
                 const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
                 if (!lastUserMessage) return;
                 setIsSuggesting(true);
-                const prompt = `Based on the user statement, suggest a simple, evidence-based psychological coping strategy or self-care tip. Make it actionable and encouraging. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
-                
-                const strategy = await callApi(prompt);
+                const prompt = `Based on this statement, suggest a simple, evidence-based coping strategy. Make it actionable. Start with "**Coping Tip & Self-Observation:**".\n**User Statement:** "${lastUserMessage.text}"`;
+                const strategy = await callApiWithRetries(prompt);
                 setMessages(prev => [...prev, { text: `🌱 ${strategy}`, sender: 'bot' }]);
                 setIsSuggesting(false);
             };
@@ -235,7 +247,6 @@
             );
         };
 
-        // This is the standard and correct way to render a React App.
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
 
