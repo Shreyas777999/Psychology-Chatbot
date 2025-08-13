@@ -54,30 +54,26 @@
             const [messages, setMessages] = useState([]);
             const [inputValue, setInputValue] = useState('');
             const [isLoading, setIsLoading] = useState(false);
-            const [responseMode, setResponseMode] = useState('conversational'); // 'conversational' or 'academic'
+            const [responseMode, setResponseMode] = useState('conversational');
             
             const messagesEndRef = useRef(null);
 
             // ===========================================================================================
-            // !!! ----------------------------- SECURITY & API KEY CONFIGURATION ---------------------- !!!
-            //
-            //   FOR YOUR PROTECTION, I have replaced your key with a placeholder.
+            // !!! ----------------------------- API KEY & MODEL CONFIGURATION ----------------------- !!!
             //
             //   1. Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
-            //   2. Get your key from: https://aistudio.google.com/app/apikey
-            //
-            //   WARNING: DO NOT post this file online with your real key in it.
+            //   2. MODEL UPGRADE: We are now using "gemini-1.5-pro-latest" for higher quality responses.
             //
             // ===========================================================================================
             const API_KEY = "AIzaSyDgBe4ibRkgIyAyTFkZuV8uiPMbIrKwRfU"; // <-- REPLACE WITH YOUR REAL KEY
-            const MODEL_NAME = "gemini-1.5-flash";
+            const MODEL_NAME = "gemini-1.5-pro-latest"; // Using the more powerful Pro model
             const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
 
             useEffect(() => {
                 messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             }, [messages]);
             
-            const callApiWithRetries = async (prompt, retries = 2, delay = 1500) => {
+            const callApiWithRetries = async (prompt, retries = 2, delay = 2000) => {
                 if (API_KEY === "YOUR_API_KEY_HERE" || !API_KEY) {
                     return "Error: API key is missing. Please replace 'YOUR_API_KEY_HERE' in the index.html file with your actual Gemini API key.";
                 }
@@ -98,7 +94,14 @@
                         }
                         
                         const result = await response.json();
-                        return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
+                        // Added safety check for empty or missing response parts
+                        if (result?.candidates?.[0]?.content?.parts?.[0]?.text) {
+                            return result.candidates[0].content.parts[0].text;
+                        } else {
+                            // This handles cases where the API returns a success code but an empty response (e.g., safety block)
+                            console.error("API returned success but no content:", result);
+                            return "I received an unusual response from the model. It might be due to a safety filter or an internal issue. Please try rephrasing your query.";
+                        }
 
                     } catch (error) {
                         console.error(`Attempt ${i + 1} failed: ${error}.`);
@@ -118,7 +121,28 @@
                 setInputValue('');
                 setIsLoading(true);
 
-                // --- NEW EFFICIENT PROMPT ENGINEERING ---
+                // --- MASTER PROMPT v3: Incorporates Mode Logic and Enhanced Detail ---
+                let academicPrompt = `
+                    **Persona:** You are a synthesis of a seasoned clinical psychologist, a university professor, and a meticulous researcher. Your knowledge is vast, spanning the entire history of psychological thought.
+                    **Task:** Provide a comprehensive, multi-faceted psychoanalytic exploration of the user's query. Your response MUST be extensive, detailed, and well-structured, comparable to a short literature review or a detailed encyclopedia entry.
+                    **Content Requirements:**
+                    1.  **Survey Major Theories:** Systematically survey relevant psychological theories (e.g., Psychodynamic, Cognitive-Behavioral (CBT), Humanistic, Attachment Theory, etc.) as they apply to the query.
+                    2.  **Delve into Nuanced Concepts:** Explore specific, relevant concepts in detail (e.g., specific cognitive distortions, defense mechanisms, core beliefs, schemas, existential anxieties).
+                    3.  **Discuss Contributing Factors:** Consider potential differential explanations or contributing factors (e.g., biological predispositions, environmental/social factors, past experiences/trauma).
+                    4.  **Conclude with Synthesis:** End with a synthesis that integrates these varied perspectives, providing a holistic understanding of the topic.
+                    **Style:** Use a clear, objective, and educational tone. Utilize markdown (bolding, bullet points, lists) to ensure the structure is clear and academically rigorous.
+                `;
+
+                let conversationalPrompt = `
+                    **Persona:** Act as an exceptionally empathetic, warm, and insightful therapist in a live session.
+                    **Task:** Help the user feel understood and gently guide them toward self-reflection. Create a safe, non-judgmental space.
+                    **Content Requirements:**
+                    1.  **Validate Feelings:** Start by validating the user's emotions. Show you understand why they might feel the way they do.
+                    2.  **Introduce Concepts Simply:** You can mention psychological concepts (like 'cognitive distortions' or 'inner critic'), but you must explain them in simple, relatable, everyday terms.
+                    3.  **Ask Guiding Questions:** Pose gentle, open-ended, Socratic questions to encourage the user to explore their own thoughts and feelings more deeply.
+                    4.  **Prioritize Feelings over Facts:** The goal is connection and self-discovery, not a lecture. Use "you" and "I" to foster a personal connection.
+                `;
+
                 let masterPrompt = `
                     You are an expert AI assistant specializing in psychology. A user has sent a query. Your task is to respond based on the specified mode.
 
@@ -126,22 +150,13 @@
                     RESPONSE MODE: "${responseMode}"
 
                     **INSTRUCTIONS:**
-                    Regardless of the mode, your response MUST be structured in two parts using specific tags:
-                    1.  **System Thought:** First, provide a concise, insightful summary of the core psychological concept or theme in the user's query. Enclose this summary in [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT] tags.
-                    2.  **Final Response:** Second, provide the main answer to the user. The style of this answer depends entirely on the RESPONSE MODE. Enclose the entire answer in [FINAL_RESPONSE]...[/FINAL_RESPONSE] tags.
+                    Your response MUST be structured in two parts using specific tags:
+                    1.  [SYSTEM_THOUGHT]...[/SYSTEM_THOUGHT]: Provide a concise, insightful summary of the core psychological theme in the user's query.
+                    2.  [FINAL_RESPONSE]...[/FINAL_RESPONSE]: Provide the main answer to the user, strictly following the persona and content instructions for the selected RESPONSE MODE below.
 
+                    ---
                     **MODE-SPECIFIC INSTRUCTIONS:**
-
-                    A) If RESPONSE MODE is "conversational":
-                       -   **Persona:** Act as an exceptionally empathetic, warm, and insightful therapist.
-                       -   **Tone:** Use a supportive, validating, and gentle tone. Use "you" and "I" to create a personal connection.
-                       -   **Content:** Your goal is to help the user feel understood and to gently guide them toward self-reflection. You can mention psychological concepts (like 'cognitive distortions'), but explain them in simple, relatable terms. Ask open-ended questions to encourage deeper thought. Prioritize emotional validation over academic lecturing.
-
-                    B) If RESPONSE MODE is "academic":
-                       -   **Persona:** Act as a knowledgeable and clear psychology professor or researcher.
-                       -   **Tone:** Use an objective, educational, and structured tone.
-                       -   **Content:** Your goal is to provide a detailed and thorough explanation. Explicitly name, define, and explain relevant psychological theories, studies, and concepts (e.g., Attachment Theory, Cognitive Behavioral Therapy, confirmation bias). Use formatting like markdown bolding and bullet points to organize complex information clearly. The response should be longer and more comprehensive than the conversational one.
-
+                    ${responseMode === 'academic' ? academicPrompt : conversationalPrompt}
                     ---
                     Begin your response now.
                 `;
@@ -152,7 +167,7 @@
                 const finalResponseMatch = fullResponse.match(/\[FINAL_RESPONSE\](.*?)\[\/FINAL_RESPONSE\]/s);
 
                 const systemThought = systemThoughtMatch ? systemThoughtMatch[1].trim() : null;
-                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : fullResponse;
+                const finalResponse = finalResponseMatch ? finalResponseMatch[1].trim() : fullResponse; 
 
                 if (systemThought) {
                     setMessages(prev => [...prev, { text: `**System Thought:** ${systemThought}`, sender: 'system-thought' }]);
@@ -192,7 +207,6 @@
                             </div>
                         </div>
 
-                        {/* --- NEW: Mode Toggle UI --- */}
                         <div className="p-2 bg-slate-100 flex justify-center">
                             <div className="mode-toggle-bg">
                                 <div className="mode-toggle-glider" style={{ transform: responseMode === 'conversational' ? 'translateX(0%)' : 'translateX(100%)' }}></div>
@@ -211,7 +225,7 @@
                             ) : (
                                 messages.map((msg, index) => (
                                     <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[80%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
+                                        <div className={`max-w-[85%] px-4 py-3 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
                                             <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
                                         </div>
                                     </div>
