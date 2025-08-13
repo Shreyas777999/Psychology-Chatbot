@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Psychology Insights Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&display=swap');
+        :root{--primary-blue:#2c3e50;--light-blue:#ecf0f1;--accent-green:#27ae60;--text-dark:#34495e;--text-light:#fdfefe;--bubble-user:#e8f6f3;--bubble-bot:#dbeaf5;--system-info:#f0f4f7;--border-light:#bdc3c7;--shadow-light:rgba(0,0,0,0.08);--shadow-medium:rgba(0,0,0,0.15);}
+        body{font-family:'Poppins',sans-serif;margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background-color:var(--light-blue);overflow:hidden;color:var(--text-dark);}
+        .full-page-container{width:100vw;height:100vh;display:flex;justify-content:center;align-items:center;padding:1.5rem;box-sizing:border-box;}
+        .chat-container{background-color:#FFFFFF;border-radius:1.5rem;box-shadow:0 25px 50px var(--shadow-medium);overflow:hidden;display:flex;flex-direction:column;width:100%;height:100%;max-width:960px;max-height:800px;transition:all 0.3s ease-out;}
+        @media (max-width:768px){.chat-container{max-width:95vw;max-height:90vh;}}
+        .header-bg{background:linear-gradient(135deg,var(--primary-blue) 0%,#3498db 100%);color:var(--text-light);padding:1.5rem 2rem;display:flex;align-items:center;justify-content:center;position:relative;border-top-left-radius:1.5rem;border-top-right-radius:1.5rem;box-shadow:0 2px 8px var(--shadow-light);z-index:10;}
+        .header-content{display:flex;align-items:center;gap:1.2rem;animation:fadeInDown 0.8s ease-out;}
+        .logo-symbol{height:50px;width:50px;border-radius:50%;box-shadow:0 3px 10px var(--shadow-medium);object-fit:cover;background-color:white;}
+        .header-title{font-family:'Lora',serif;font-size:1.8rem;font-weight:700;letter-spacing:-0.03em;text-shadow:1px 1px 3px rgba(0,0,0,0.2);}
+        .header-subtitle{font-family:'Poppins',sans-serif;font-size:0.95rem;opacity:0.9;}
+        .logo-welcome-subtle{height:100px;width:100px;opacity:0.4;margin-bottom:1.5rem;object-fit:contain;}
+        .chat-message-user{background-color:var(--bubble-user);color:var(--text-dark);border-radius:1rem;border-bottom-right-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
+        .chat-message-bot{background-color:var(--bubble-bot);color:var(--text-dark);border-radius:1rem;border-bottom-left-radius:0.5rem;box-shadow:0 1px 3px var(--shadow-light);}
+        .chat-message-system-thought{background-color:var(--system-info);color:var(--text-dark);font-size:0.85rem;font-style:italic;border-radius:0.75rem;border-left:5px solid var(--border-light);padding-left:1.2rem;box-shadow:0 1px 2px rgba(0,0,0,0.03);}
+        .chat-message-bot p,.chat-message-user p,.chat-message-system-thought p{margin-bottom:0.5em;line-height:1.6;white-space:pre-wrap;}
+        .chat-message-bot p:last-child,.chat-message-user p:last-child,.chat-message-system-thought p:last-child{margin-bottom:0;}
+        .input-field{border:1px solid var(--border-light);border-radius:9999px;padding:0.8rem 1.6rem;transition:border-color 0.2s ease-in-out,box-shadow 0.2s ease-in-out;box-shadow:inset 0 1px 2px rgba(0,0,0,0.04);font-size:1rem;color:var(--text-dark);}
+        .input-field:focus{outline:none;border-color:var(--accent-green);box-shadow:0 0 0 3px rgba(39,174,96,0.2);}
+        .send-button{background-color:var(--accent-green);border-radius:9999px;width:60px;height:48px;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px var(--shadow-light);transition:background-color 0.3s ease,transform 0.2s ease;flex-shrink:0;}
+        .send-button:hover{background-color:#2ecc71;transform:scale(1.05);box-shadow:0 3px 8px var(--shadow-medium);}
+        .feature-button{font-weight:500;padding:0.7rem 1.4rem;border-radius:9999px;box-shadow:0 2px 5px var(--shadow-light);transition:background-color 0.3s ease,transform 0.2s ease-in-out,box-shadow 0.2s ease-in-out;color:var(--text-light);display:flex;align-items:center;gap:0.6rem;font-size:0.9rem;}
+        .dot-pulse{display:flex;align-items:center;justify-content:center;}
+        .dot-pulse-dot{width:8px;height:8px;background-color:var(--primary-blue);border-radius:50%;margin:0 4px;animation:dotPulse 1.2s infinite ease-in-out;}
+        .dot-pulse-dot:nth-child(1){animation-delay:0s;}
+        .dot-pulse-dot:nth-child(2){animation-delay:0.15s;}
+        .dot-pulse-dot:nth-child(3){animation-delay:0.3s;}
+        @keyframes dotPulse{0%,100%{transform:scale(0.7);opacity:0.7;}50%{transform:scale(1);opacity:1;}}
+        @keyframes fadeInDown{from{opacity:0;transform:translateY(-15px);}to{opacity:1;transform:translateY(0);}}
+        @keyframes fadeInUp{from{opacity:0;transform:translateY(15px);}to{opacity:1;transform:translateY(0);}}
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        document.addEventListener('DOMContentLoaded', () => {
+            const { useState, useEffect, useRef } = React;
+            const { createRoot } = ReactDOM;
+            const marked = window.marked;
+
+            // Define the URL for your Python backend
+            const BACKEND_API_URL = 'http://127.0.0.1:5001/api/generate';
+
+            const App = () => {
+                const [messages, setMessages] = useState([]);
+                const [inputValue, setInputValue] = useState('');
+                const [isLoading, setIsLoading] = useState(false);
+                const [isAnalyzing, setIsAnalyzing] = useState(false);
+                const [isSuggesting, setIsSuggesting] = useState(false);
+                const messagesEndRef = useRef(null);
+
+                useEffect(() => {
+                    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+                }, [messages]);
+
+                // Helper function to call our backend API
+                const callBackendApi = async (prompt) => {
+                    try {
+                        const response = await fetch(BACKEND_API_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ prompt: prompt })
+                        });
+
+                        if (!response.ok) {
+                            const errorResult = await response.json();
+                            console.error("Backend API Error:", errorResult);
+                            return `Error: ${errorResult.error || 'Failed to get response from server.'}`;
+                        }
+
+                        const result = await response.json();
+                        // Extract the text from the Gemini API's response structure
+                        return result?.candidates?.[0]?.content?.parts?.[0]?.text || "I'm sorry, I couldn't process that response.";
+
+                    } catch (error) {
+                        console.error(`Network or fetch error: ${error}`);
+                        return "I'm having trouble connecting to my brain right now. Please check if the backend server is running and try again.";
+                    }
+                };
+
+                // 1. Generate the "Psychological Direction"
+                const generateOptimizedPsychPrompt = async (userInput) => {
+                    const simpleGreetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
+                    if (userInput.split(' ').length <= 3 && simpleGreetings.includes(userInput.toLowerCase().trim())) {
+                        return "SIMPLE_GREETING";
+                    }
+                    const promptForDirection = `You are an expert prompt engineer for a psychology chatbot. Your goal is to convert raw user input into a highly refined, insightful, and precise psychological "direction" that guides a specialized psychology expert AI. This "direction" should distill the core psychological essence, potential underlying issues, and relevant theoretical frameworks without being a question. If the user input is very general or vague, provide a direction that encourages the main bot to ask clarifying questions before diving deep. Follow these steps meticulously: 1. **Initial Analysis:** Read the user's input. What are the explicit emotions, situations, or questions? 2. **Identify Core Psychological Themes:** Based on the initial analysis, what are the primary psychological concepts, disorders, cognitive patterns, or relational dynamics at play? Think broadly (e.g., anxiety, depression, cognitive distortions, attachment styles, grief, self-esteem, burnout). 3. **Consider Underlying Aspects (Psychological Nudging):** What might the user *not* be explicitly stating but could be an important psychological component? (e.g., trauma, unmet needs, irrational beliefs, defense mechanisms, systemic factors). Nudge towards deeper psychological inquiry. 4. **Formulate a Concise Direction:** Synthesize your analysis into a single, highly focused, academic, and insightful psychological direction. This direction should be a statement, not a question, that directly points the psychology expert AI towards the most valuable and nuanced areas to discuss. It should imply the *kind* of psychological explanation or guidance needed. If the user's input clearly describes a complex situation requiring an initial assessment or probing questions from a therapist, include "INITIAL_ASSESSMENT_NEEDED" at the beginning of your direction. **Examples for guidance:** - User Input: "I feel really down lately and can't get out of bed." - Final Direction: "Symptoms indicative of a depressive episode, exploring concepts like anhedonia, learned helplessness, and the role of behavioral activation." - User Input: "Why do I get so angry at small things my partner does?" - Final Direction: "Disproportionate anger responses in romantic relationships, analyzing triggers, emotional regulation strategies, and the impact of attachment styles on conflict." - User Input: "I'm having trouble with stress at work." - Final Direction: "INITIAL_ASSESSMENT_NEEDED: General work-related stress; prompt discussion on specific stressors, coping mechanisms, and work-life balance." Your turn. User Input: "${userInput}" Final Direction:`;
+                    return callBackendApi(promptForDirection);
+                };
+
+                // 2. Get the final bot response based on the direction
+                const getPsychBotResponse = async (optimizedPrompt) => {
+                    if (optimizedPrompt === "SIMPLE_GREETING") {
+                        return "Hello! It's good to connect with you. How are you feeling today, or what's on your mind? I'm here to listen.";
+                    }
+                    const isInitialAssessmentNeeded = optimizedPrompt.startsWith("INITIAL_ASSESSMENT_NEEDED:");
+                    let finalPrompt;
+                    if (isInitialAssessmentNeeded) {
+                        const coreDirection = optimizedPrompt.substring("INITIAL_ASSESSMENT_NEEDED:".length).trim();
+                        finalPrompt = `You are an expert, empathetic, and insightful therapist. The user has presented a complex situation requiring an initial therapeutic assessment. Based on the following psychological focus: "${coreDirection}", your response should: 1. **Start with empathy and validation:** Acknowledge the user's feelings and the difficulty of their situation. 2. **Provide initial insights into key symptoms:** Briefly explain the potential psychological underpinnings of explicitly mentioned symptoms (e.g., lack of sleep, nightmares, social withdrawal, anhedonia). 3. **Ask thoughtful, open-ended probing questions:** Guide the user to elaborate on their experience, history, and specific triggers to deepen your understanding. This is crucial for a therapist's role. 4. **Maintain a conversational flow:** Use clear paragraphs and natural phrasing. Avoid sounding like a textbook or a list. 5. **Use markdown naturally:** Bold important concepts or phrases for emphasis. Focus on facilitating a deeper conversation. Do not include conversational filler at the beginning or end.`;
+                    } else {
+                        finalPrompt = `You are an expert, empathetic, and insightful therapist. Your goal is to provide a conversational yet academically wise psychoanalysis and guidance based on the user's psychological focus: "${optimizedPrompt}". Your response should: 1. **Sound like a real therapist:** Use compassionate, understanding, and gently challenging language. 2. **Be insightful and sharp:** Go beyond superficial observations, touching upon deeper psychological principles (e.g., cognitive distortions, defense mechanisms, attachment theory, humanistic principles) relevant to the focus, without using overly complex jargon. 3. **Offer actionable self-reflection or guidance:** Provide gentle nudges for the user to explore their own thoughts, feelings, or behaviors. This is not medical advice, but therapeutic reflection. 4. **Maintain a conversational flow:** Use clear paragraphs and natural phrasing. Avoid sounding like a textbook or a list. 5. **Use markdown naturally:** Bold important concepts or phrases for emphasis, but do not bold entire sections unless truly warranted. Focus directly on the psychoanalysis and guidance. Do not include conversational filler at the beginning or end.`;
+                    }
+                    return callBackendApi(finalPrompt);
+                };
+
+                const handleSendMessage = async (e) => {
+                    e.preventDefault();
+                    const userQuery = inputValue.trim();
+                    if (!userQuery) return;
+
+                    setMessages(prev => [...prev, { text: userQuery, sender: 'user' }]);
+                    setInputValue('');
+                    setIsLoading(true);
+
+                    try {
+                        const optimizedPromptDirection = await generateOptimizedPsychPrompt(userQuery);
+                        if (!optimizedPromptDirection.startsWith("Error:") && !optimizedPromptDirection.startsWith("I'm having trouble")) {
+                             if (optimizedPromptDirection !== "SIMPLE_GREETING") {
+                                setMessages(prev => [...prev, { text: `**System Thought:** Focusing on the psychological area of: "${optimizedPromptDirection}"`, sender: 'system-thought' }]);
+                             }
+                             const botResponse = await getPsychBotResponse(optimizedPromptDirection);
+                             setMessages(prev => [...prev, { text: botResponse, sender: 'bot' }]);
+                        } else {
+                            // If the first API call fails, show an error
+                            setMessages(prev => [...prev, { text: optimizedPromptDirection, sender: 'bot' }]);
+                        }
+                    } catch (error) {
+                        console.error("Error processing message:", error);
+                        setMessages(prev => [...prev, { text: "Oops! Something went wrong. Please try again.", sender: 'bot' }]);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+
+                const analyzeLastMessageSentiment = async () => {
+                    const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
+                    if (!lastUserMessage) return;
+                    setIsAnalyzing(true);
+                    const prompt = `Analyze the primary, and potentially secondary or underlying, emotions or sentiments expressed in the following text. Beyond obvious feelings, consider what the user might be experiencing but not explicitly acknowledging or recognizing (a psychological "blindspot"). Provide: 1. A concise description of the main emotion(s) and any identified blindspots. 2. A brief, empathetic psychological insight explaining *why* these emotions/blindspots might be present based on the content. Start with "**Emotion & Insight:**" and be direct. Do NOT use any other bolding unless strictly necessary for a key term within your explanation. Text: "${lastUserMessage.text}"`;
+
+                    const analysis = await callBackendApi(prompt);
+                    setMessages(prev => [...prev, { text: `✨ ${analysis}`, sender: 'bot' }]);
+                    setIsAnalyzing(false);
+                };
+
+                const suggestCopingStrategy = async () => {
+                    const lastUserMessage = messages.slice().reverse().find(msg => msg.sender === 'user');
+                    if (!lastUserMessage) return;
+                    setIsSuggesting(true);
+                    const prompt = `Based on the following user statement, and assuming there might be an unacknowledged emotion or cognitive pattern (a "blindspot"), suggest a simple, evidence-based psychological coping strategy or a self-care tip. The tip should also guide the user on how to observe or become more aware of this potential blindspot and how to best deal with the underlying feeling. Make it actionable, encouraging, and concise. Start with "**Coping Tip & Self-Observation:**" and be direct. Do NOT use any other bolding unless strictly necessary for a key term within your explanation. User Statement: "${lastUserMessage.text}"`;
+
+                    const strategy = await callBackendApi(prompt);
+                    setMessages(prev => [...prev, { text: `🌱 ${strategy}`, sender: 'bot' }]);
+                    setIsSuggesting(false);
+                };
+
+
+                return (
+                    <div className="full-page-container">
+                        <div className="chat-container">
+                             <div className="header-bg text-white shadow-md rounded-t-3xl">
+                                <div className="header-content">
+                                    <img src="logo.png" alt="Psychology Symbol" className="logo-symbol"/>
+                                    <div>
+                                        <h1 className="header-title">Psychology Insights</h1>
+                                        <p className="header-subtitle">Your AI Companion for Well-being</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 p-4 sm:p-6 overflow-y-auto flex flex-col gap-3">
+                                {messages.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center h-full text-gray-500 text-center p-4">
+                                        <img src="logo.png" alt="Psychology Symbol" className="logo-welcome-subtle"/>
+                                        <p className="text-xl font-medium font-lora text-gray-700">Explore your mind and emotions with AI.</p>
+                                        <p className="text-md mt-2 font-poppins text-gray-600">Ask about psychological theories, analyze your feelings, or discover coping strategies.</p>
+                                    </div>
+                                ) : (
+                                    messages.map((msg, index) => (
+                                        <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-[75%] px-4 py-2 text-wrap break-words ${msg.sender === 'user' ? 'chat-message-user' : msg.sender === 'bot' ? 'chat-message-bot' : 'chat-message-system-thought'}`}>
+                                                <div dangerouslySetInnerHTML={{ __html: marked.parse(msg.text) }}></div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                                <div className="flex justify-start">
+                                    {(isLoading || isAnalyzing || isSuggesting) && (
+                                        <div className="max-w-[80%] px-4 py-2 rounded-xl">
+                                            <div className="dot-pulse">
+                                                <div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div><div className="dot-pulse-dot"></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div ref={messagesEndRef}></div>
+                            </div>
+
+                            <form onSubmit={handleSendMessage} className="p-4 sm:p-5 bg-white border-t border-gray-100 flex items-center gap-3">
+                                <div className="flex-1">
+                                    <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)} placeholder="Type your question or thought here..." className="input-field w-full" disabled={isLoading || isAnalyzing || isSuggesting}/>
+                                </div>
+                                <button type="submit" className="send-button text-white" disabled={isLoading || isAnalyzing || isSuggesting || !inputValue.trim()}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path fillRule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.647c1.295.742 1.295 2.545 0 3.286L7.279 20.99c-1.25.717-2.779-.217-2.779-1.643V5.653Z" clipRule="evenodd" /></svg>
+                                </button>
+                            </form>
+
+                            <div className="p-4 sm:p-5 bg-gray-50 border-t border-gray-100 flex justify-center gap-4 flex-wrap">
+                                <button onClick={analyzeLastMessageSentiment} className="feature-button bg-blue-600 hover:bg-blue-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                                    {isAnalyzing ? 'Analyzing...' : 'Analyze My Feelings'}
+                                </button>
+                                <button onClick={suggestCopingStrategy} className="feature-button bg-green-600 hover:bg-green-700" disabled={isLoading || isAnalyzing || isSuggesting || messages.filter(msg => msg.sender === 'user').length === 0}>
+                                    {isSuggesting ? 'Suggesting...' : 'Coping Tips'}
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                );
+            };
+
+            const root = createRoot(document.getElementById('root'));
+            root.render(<App />);
+        });
+    </script>
+</body>
+</html>
